@@ -241,6 +241,10 @@
         <span class="toggle-label">Auto-generate batch no. on export</span>
         <label class="toggle"><input type="checkbox" id="autoBatch" checked onchange="toggleAutoBatch()"/><span class="slider"></span></label>
       </div>
+      <div class="toggle-row">
+        <span class="toggle-label">Thermal sharpen on download <span style="font-size:0.72rem;color:var(--muted)">(strips anti-alias grey)</span></span>
+        <label class="toggle"><input type="checkbox" id="thermalSharpen" checked/><span class="slider"></span></label>
+      </div>
 
       <div class="divider"></div>
 
@@ -468,7 +472,7 @@ function drawLabel(cx, cW, cH, vals) {
   // ── DIVIDER 2 ─────────────────────────────────────────────
   const D2Y = s(308);
   if (vals.showRules) {
-    cx.fillStyle = vals.inverted ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.18)';
+    cx.fillStyle = vals.inverted ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.55)';
     cx.fillRect(tx, D2Y, maxW, s(3));
   }
 
@@ -481,23 +485,38 @@ function drawLabel(cx, cW, cH, vals) {
   cx.textBaseline = 'top';
   cx.fillText(vals.disclaimer, tx, R3Y);
 
-  // Meta info: batch + storage, right-aligned, dimmed
+  // Meta info: batch + storage, right-aligned
   const metaParts = [];
   if (vals.batchNo) metaParts.push(`Batch: ${vals.batchNo}`);
   if (vals.storage) metaParts.push(vals.storage);
   if (metaParts.length > 0) {
     const metaTxt = metaParts.join('  ·  ');
     let mSize = s(46);
-    cx.font = `${mSize}px Arial, sans-serif`;
-    while (cx.measureText(metaTxt).width > maxW * 0.52 && mSize > s(24)) {
+    cx.font = `bold ${mSize}px Arial, sans-serif`;
+    while (cx.measureText(metaTxt).width > maxW * 0.65 && mSize > s(28)) {
       mSize -= s(2);
-      cx.font = `${mSize}px Arial, sans-serif`;
+      cx.font = `bold ${mSize}px Arial, sans-serif`;
     }
-    cx.fillStyle    = vals.inverted ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)';
+    cx.fillStyle    = vals.inverted ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)';
     cx.textAlign    = 'right';
     cx.textBaseline = 'top';
     cx.fillText(metaTxt, tx + maxW, R3Y + Math.round((dSize - mSize) / 2));
   }
+}
+
+// Converts every pixel to pure black or white — strips anti-aliased grey fringes
+// so thermal printer gets clean binary input instead of dithering grey blobs.
+function binarizeCanvas(canvas) {
+  const cx = canvas.getContext('2d');
+  const id = cx.getImageData(0, 0, canvas.width, canvas.height);
+  const d  = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const lum = d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114;
+    const v   = lum >= 128 ? 255 : 0;
+    d[i] = d[i+1] = d[i+2] = v;
+    d[i+3] = 255;
+  }
+  cx.putImageData(id, 0, 0);
 }
 
 function randomBatch() {
@@ -574,6 +593,7 @@ function downloadSingle() {
   const filename = `omnipep_${vals.name.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_${vals.dosage.replace(/\s/g,'')}.png`;
   const off = new OffscreenCanvas(W, H);
   drawLabel(off.getContext('2d'), W, H, vals);
+  if (document.getElementById('thermalSharpen').checked) binarizeCanvas(off);
   off.convertToBlob({ type: 'image/png' }).then(blob => exportBlob(vals, filename, blob));
 }
 
@@ -620,6 +640,7 @@ async function downloadBatch() {
 
     const off  = new OffscreenCanvas(W, H);
     drawLabel(off.getContext('2d'), W, H, vals);
+    if (document.getElementById('thermalSharpen').checked) binarizeCanvas(off);
     const filename = `omnipep_${name.replace(/[^a-z0-9]/gi,'_').toLowerCase()}_${dosage.replace(/\s/g,'')}.png`;
     const blob = await off.convertToBlob({ type: 'image/png' });
     exportBlob(vals, filename, blob);
