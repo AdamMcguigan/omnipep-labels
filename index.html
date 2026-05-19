@@ -456,11 +456,24 @@ function drawLabel(cx, cW, cH, vals) {
     cx.fillRect(tx, D1Y, maxW, s(5));
   }
 
-  // ── ROW 2: Brand ──────────────────────────────────────────
+  // ── ROW 2: Brand (left) + Storage temp (right) ───────────────────────────
   const R2Y = D1Y + s(13);
+
+  // Measure storage temp first so brand can avoid overlapping it
+  let stSize = s(62), storageW = 0;
+  if (vals.storage) {
+    cx.font = `bold ${stSize}px Arial, sans-serif`;
+    while (cx.measureText(vals.storage).width > maxW * 0.36 && stSize > s(26)) {
+      stSize -= s(2);
+      cx.font = `bold ${stSize}px Arial, sans-serif`;
+    }
+    storageW = cx.measureText(vals.storage).width + s(18);
+  }
+
+  // Brand — left-aligned, constrained to not overlap storage
   let bSize = vals.brandFontOverride > 0 ? s(vals.brandFontOverride) : s(76);
   cx.font = `bold ${bSize}px Arial, sans-serif`;
-  while (cx.measureText(vals.brand).width > maxW && bSize > s(28)) {
+  while (cx.measureText(vals.brand).width > maxW - storageW && bSize > s(26)) {
     bSize -= s(3);
     cx.font = `bold ${bSize}px Arial, sans-serif`;
   }
@@ -469,6 +482,15 @@ function drawLabel(cx, cW, cH, vals) {
   cx.textBaseline = 'top';
   cx.fillText(vals.brand, tx, R2Y);
 
+  // Storage temp — right-aligned, vertically centred within brand row
+  if (vals.storage) {
+    cx.font = `bold ${stSize}px Arial, sans-serif`;
+    cx.fillStyle    = vals.inverted ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)';
+    cx.textAlign    = 'right';
+    cx.textBaseline = 'top';
+    cx.fillText(vals.storage, tx + maxW, R2Y + Math.round((bSize - stSize) / 2));
+  }
+
   // ── DIVIDER 2 ─────────────────────────────────────────────
   const D2Y = s(308);
   if (vals.showRules) {
@@ -476,31 +498,41 @@ function drawLabel(cx, cW, cH, vals) {
     cx.fillRect(tx, D2Y, maxW, s(3));
   }
 
-  // ── ROW 3: Disclaimer + batch + storage ───────────────────
+  // ── ROW 3: Disclaimer (left) + Batch no. only (right) ─────────────────────
   const R3Y = D2Y + s(11);
-  let dSize = vals.disclaimerFontOverride > 0 ? s(vals.disclaimerFontOverride) : s(52);
+
+  // Measure batch number width first so disclaimer can avoid overlapping it
+  let mSize = s(46), batchMetaW = 0;
+  if (vals.batchNo) {
+    const batchTxt = `Batch: ${vals.batchNo}`;
+    cx.font = `bold ${mSize}px Arial, sans-serif`;
+    while (cx.measureText(batchTxt).width > maxW * 0.5 && mSize > s(26)) {
+      mSize -= s(2);
+      cx.font = `bold ${mSize}px Arial, sans-serif`;
+    }
+    batchMetaW = cx.measureText(batchTxt).width + s(16);
+  }
+
+  // Disclaimer — bigger default now that storage is on the brand row
+  let dSize = vals.disclaimerFontOverride > 0 ? s(vals.disclaimerFontOverride) : s(68);
   cx.font = `bold ${dSize}px Arial, sans-serif`;
+  while (cx.measureText(vals.disclaimer).width > maxW - batchMetaW && dSize > s(28)) {
+    dSize -= s(3);
+    cx.font = `bold ${dSize}px Arial, sans-serif`;
+  }
   cx.fillStyle    = FG;
   cx.textAlign    = 'left';
   cx.textBaseline = 'top';
   cx.fillText(vals.disclaimer, tx, R3Y);
 
-  // Meta info: batch + storage, right-aligned
-  const metaParts = [];
-  if (vals.batchNo) metaParts.push(`Batch: ${vals.batchNo}`);
-  if (vals.storage) metaParts.push(vals.storage);
-  if (metaParts.length > 0) {
-    const metaTxt = metaParts.join('  ·  ');
-    let mSize = s(46);
+  // Batch number only — right-aligned, vertically centred relative to disclaimer
+  if (vals.batchNo) {
+    const batchTxt = `Batch: ${vals.batchNo}`;
     cx.font = `bold ${mSize}px Arial, sans-serif`;
-    while (cx.measureText(metaTxt).width > maxW * 0.65 && mSize > s(28)) {
-      mSize -= s(2);
-      cx.font = `bold ${mSize}px Arial, sans-serif`;
-    }
     cx.fillStyle    = vals.inverted ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.8)';
     cx.textAlign    = 'right';
     cx.textBaseline = 'top';
-    cx.fillText(metaTxt, tx + maxW, R3Y + Math.round((dSize - mSize) / 2));
+    cx.fillText(batchTxt, tx + maxW, R3Y + Math.round((dSize - mSize) / 2));
   }
 }
 
